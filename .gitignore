@@ -1,0 +1,30 @@
+# Secrets — never commit
+.env
+*.env
+!.env.example
+secrets.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Generated data (regenerate with `python -m kanakku generate`)
+data/generated/
+data/uploads/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Local tool config
+.claude/

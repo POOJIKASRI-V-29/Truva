@@ -1,0 +1,130 @@
+{
+  "generator_config": {
+    "seed": 42,
+    "n_orders": 10000,
+    "start_date": "2026-08-12",
+    "days": 52,
+    "as_of": "2026-10-15",
+    "settlement_lag_days": 2,
+    "instant_share": 0.08,
+    "missing_from_gateway": 0.015,
+    "amount_mismatch": 0.012,
+    "fee_difference": 0.01,
+    "duplicate_payment": 0.008,
+    "cancelled_but_captured": 0.004,
+    "chargeback": 0.003,
+    "refund_not_processed": 0.003,
+    "clean_refund": 0.02,
+    "cancelled_no_payment": 0.015,
+    "fuzzy_reference": 0.008,
+    "rounding_within_tolerance": 0.02,
+    "failed_then_retried": 0.04,
+    "instant_missing_bank": 25,
+    "instant_delayed": 25,
+    "orphan_gateway_payments": 20,
+    "ambiguous_fuzzy_pairs": 5,
+    "batch_missing": 4,
+    "batch_delayed": 6,
+    "batch_fee_difference": 4,
+    "batch_amount_mismatch": 3,
+    "bank_duplicate_credit": 3,
+    "batch_unreferenced": 8,
+    "orphan_bank_credits": 10
+  },
+  "rows": {
+    "orders": 10021,
+    "gateway": 10515,
+    "bank": 954,
+    "ground_truth": 10231
+  },
+  "settlement_batches": 113,
+  "data_quality_injected": {
+    "orders": {
+      "invalid_rows": 8,
+      "exact_duplicates": 6,
+      "conflicting_duplicates": 2
+    },
+    "gateway": {
+      "invalid_rows": 6,
+      "exact_duplicates": 6,
+      "conflicting_duplicates": 0
+    },
+    "bank": {
+      "invalid_rows": 4,
+      "exact_duplicates": 3,
+      "conflicting_duplicates": 0
+    }
+  },
+  "seeded_issue_counts": [
+    {
+      "entity_level": "BANK_TXN",
+      "true_issue_code": "POSSIBLE_DUPLICATE",
+      "n": 3
+    },
+    {
+      "entity_level": "BANK_TXN",
+      "true_issue_code": "UNRESOLVED",
+      "n": 10
+    },
+    {
+      "entity_level": "GATEWAY_TXN",
+      "true_issue_code": "POSSIBLE_DUPLICATE",
+      "n": 80
+    },
+    {
+      "entity_level": "GATEWAY_TXN",
+      "true_issue_code": "UNRESOLVED",
+      "n": 20
+    },
+    {
+      "entity_level": "ORDER",
+      "true_issue_code": "AMOUNT_MISMATCH",
+      "n": 120
+    },
+    {
+      "entity_level": "ORDER",
+      "true_issue_code": "DELAYED_SETTLEMENT",
+      "n": 25
+    },
+    {
+      "entity_level": "ORDER",
+      "true_issue_code": "MISSING_FROM_BANK",
+      "n": 25
+    },
+    {
+      "entity_level": "ORDER",
+      "true_issue_code": "MISSING_FROM_GATEWAY",
+      "n": 150
+    },
+    {
+      "entity_level": "ORDER",
+      "true_issue_code": "POSSIBLE_FEE_DIFFERENCE",
+      "n": 100
+    },
+    {
+      "entity_level": "ORDER",
+      "true_issue_code": "REVERSAL_OR_CANCELLATION",
+      "n": 100
+    },
+    {
+      "entity_level": "SETTLEMENT_BATCH",
+      "true_issue_code": "AMOUNT_MISMATCH",
+      "n": 3
+    },
+    {
+      "entity_level": "SETTLEMENT_BATCH",
+      "true_issue_code": "DELAYED_SETTLEMENT",
+      "n": 6
+    },
+    {
+      "entity_level": "SETTLEMENT_BATCH",
+      "true_issue_code": "MISSING_FROM_BANK",
+      "n": 4
+    },
+    {
+      "entity_level": "SETTLEMENT_BATCH",
+      "true_issue_code": "POSSIBLE_FEE_DIFFERENCE",
+      "n": 4
+    }
+  ]
+}
