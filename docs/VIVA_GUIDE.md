@@ -1,6 +1,6 @@
-# Kanakku: beginner's guide and viva preparation
+# Truva: beginner's guide and viva preparation
 
-This guide explains Kanakku in plain language so you can defend every part of it honestly.
+This guide explains Truva in plain language so you can defend every part of it honestly.
 
 ---
 
@@ -9,10 +9,10 @@ This guide explains Kanakku in plain language so you can defend every part of it
 A shop sells online. For every sale, three systems keep a record:
 
 - **the shop's order ledger:** "Order ORD-0001234, ₹1,499, paid by card"
-- **the payment gateway:** "I captured ₹1,499 for ORD-0001234, kept ₹33.62 as fee + GST, and will pay the shop ₹1,465.38 in batch STL-20260903-02"
+- **the payment gateway:** "I captured ₹1,499 for ORD-0001234, kept ₹33.61 as fee + GST (₹28.48 fee at 1.90% plus ₹5.13 GST), and will pay the shop ₹1,465.39 in batch STL-20260903-02"
 - **the bank statement:** "Received ₹1,32,410.55 from SYNTHPAY, narration: SETTLEMENT/STL-20260903-02"
 
-Reconciliation means proving these three agree and, where they don't, explaining why. Kanakku automates that and
+Reconciliation means proving these three agree and, where they don't, explaining why. Truva automates that and
 ranks the problems.
 
 ## 2. The important files
@@ -25,15 +25,16 @@ ranks the problems.
 | `sql/reconcile.sql` | **The heart:** the SQL that matches, classifies and explains, run entirely inside Exasol |
 | `kanakku/reconciliation.py` | Runs that SQL as one transaction and records the run |
 | `kanakku/priority.py` | The scoring rules, in one place, used by both Python and SQL |
-| `kanakku/evaluation.py` | Compares Kanakku's answers to the answer key |
+| `kanakku/evaluation.py` | Compares Truva's answers to the answer key |
+| `sql/patterns.sql` + `kanakku/patterns.py` | Recurring-Break Intelligence: groups open exceptions to find clusters, then words each real cluster as a hypothesis to check |
 | `kanakku/resolution.py` | Saves analyst decisions to the log |
 | `app/` | The Streamlit dashboard |
-| `tests/` | 111 automated tests |
+| `tests/` | 142 automated tests |
 
 ## 3. The tables
 
 - **ORDERS / GATEWAY_TRANSACTIONS / BANK_TRANSACTIONS:** the three sources, one row per record.
-- **RECONCILIATION_RESULTS:** Kanakku's verdict. For each run there is exactly one row per order, per settlement batch, and per gateway or bank record that has a problem.
+- **RECONCILIATION_RESULTS:** Truva's verdict. For each run there is exactly one row per order, per settlement batch, and per gateway or bank record that has a problem.
 - **RESOLUTION_LOG:** a diary of what analysts did. Rows are only ever added, never edited.
 - **RECON_RUNS:** one row per reconciliation run, with its settings and totals.
 - **INGESTION_LOG / INGESTION_REJECTS:** what each load accepted and rejected, and why.
@@ -71,16 +72,18 @@ A delayed settlement that arrived with the right amount has ₹0 at risk, so it 
 
 ## 7. Test results (measured)
 
-- 92 unit tests: money parsing, CSV validation, generator, score thresholds, evaluation maths.
-- 19 integration tests against real Exasol: every rule on a hand-built dataset, tolerance boundary, reload safety, rerun stability, resolution carry-forward, rollback on failure, and SQL-vs-Python score agreement.
-- **All 111 passed** (`python -m pytest -q`, about 9 seconds).
+- 116 unit tests: money parsing, CSV validation, generator, score thresholds, evaluation maths, recurring-break statistics and wording.
+- 26 integration tests against real Exasol: every rule on a hand-built dataset, tolerance boundary, reload safety, rerun stability, resolution carry-forward, rollback on failure, SQL-vs-Python score agreement, and a planted recurring pattern that must be found.
+- **All 142 passed** (`.venv/bin/python -m pytest -q`, about 13 seconds).
 - On the 10,000-order sample: precision 0.970, recall 1.000. The 20 false positives are the deliberately ambiguous pairs.
 
 ## 8. Commands
 
 ```bash
-exasol start
+~/.local/bin/exasol start
 ```
+
+(Plain `exasol start` works only after `~/.local/bin` is on your `PATH`; see the README's setup section.)
 
 ```bash
 .venv/bin/python -m kanakku demo
@@ -139,7 +142,7 @@ Confirmed means the fact is directly visible: no bank line carries this batch re
 "this looks like a second charge" or "this is the only unreferenced credit of that exact amount". Suspected
 items need a human.
 
-**Q8. Could Kanakku say someone committed fraud?**
+**Q8. Could Truva say someone committed fraud?**
 No. It never uses the word, and a test checks the explanations. Duplicates and unexplained cash can have innocent
 causes (retries, manual transfers). The score ranks investigation order, nothing more.
 
@@ -174,12 +177,39 @@ severity (25 each), then close impact (10). The first bands (High ≥ 60) put 58
 almost every synthetic exception is over 30 days old. I raised them to High ≥ 70 and Medium ≥ 50, which gives
 25% / 54% / 21%. They are not calibrated on real outcomes.
 
+**Q16a. What is Recurring-Break Intelligence, and how is it different from the queue?**
+The queue ranks single exceptions. This feature asks whether the open exceptions *cluster*: by payment method,
+settlement batch, amount-difference shape or age. A cluster suggests one upstream cause to fix once. The grouping
+is one SQL query in Exasol; Python then decides which groups are real and writes the text.
+
+**Q16b. How do you avoid reporting chance clusters?**
+Each group's rate gets a 95% Wilson lower bound. The bound is made stricter for the number of groups compared
+(Bonferroni): 104 settlement batches means each one is tested at α/104. A group is reported only if it has at
+least 3 exceptions and its lower bound beats the overall rate (or 50% for share groups). On the sample, every
+batch "hotspot" was rejected this way, including one with 10 exceptions in 82 orders.
+
+**Q16c. What did it find on your data, and is that a real finding?**
+Two moderate patterns: 79 of 80 duplicates are UPI (2× the overall rate), and 62% of reversals are 30–59 days
+old. The UPI one is real in the data but comes from my generator: it assigns scenarios in sequence, and the
+fee-difference step (non-UPI orders only) runs just before the duplicate step. So it shows the feature can find
+a skew nobody told it about. It says nothing about real UPI systems.
+
+**Q16d. Why are some groupings left out?**
+Because they would only restate a rule. Fee differences are flagged *by* their shape, so grouping them by shape
+proves nothing. Bank-leg issues are judged per order only for instant settlements, so "all order-level missing
+settlements are instant" would be true by construction. UPI has a 0% fee, so it is left out of the
+fee-difference baseline instead of making the other methods look worse.
+
+**Q16e. Does it claim causes?**
+No. Every text says "Hypothesis (not verified)", gives the numbers separately, and says what check would confirm
+or refute it. A test fails if any generated text says "root cause", "proven", "definitely" or "fraud".
+
 **Q16. What would you build next?**
 Column mappings for real gateway formats, partial and multi-part settlements, multi-currency, per-merchant fee
 cards, user accounts with an approval workflow, and scheduled runs.
 
 **Q17. What did you verify yourself, and what didn't you?**
 I verified: Exasol install and connectivity, loading, all four stages, scoring, evaluation, resolution persistence,
-111 passing tests, and every dashboard page loading with live data, including a status update made through the UI.
+142 passing tests, every dashboard page (including Recurring Breaks) loading with live data, and a status update made through the UI.
 I did not verify: behaviour on real bank or gateway files, performance beyond 10,000 orders, or other operating
 systems.

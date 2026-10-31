@@ -44,7 +44,7 @@ left, right = st.columns([3, 2])
 with left:
     st.subheader("Evidence")
     pairs = [p.split("=", 1) for p in (r["evidence"] or "").split("; ") if "=" in p]
-    st.dataframe(pd.DataFrame(pairs, columns=["Field", "Value"]), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(pairs, columns=["Field", "Value"]), hide_index=True, width="stretch")
 with right:
     st.subheader("Why this priority")
     if r["is_exception"]:
@@ -53,7 +53,7 @@ with right:
         fig = go.Figure(go.Bar(x=list(parts.values()), y=list(parts), orientation="h", marker_color=common.BLUE,
                                text=[int(v) for v in parts.values()], textposition="outside"))
         fig.update_layout(height=220, margin=dict(l=0, r=20, t=0, b=0), xaxis=dict(range=[0, 45]), plot_bgcolor="white")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
         st.caption(r["priority_reason"])
     else:
         st.write("Not an exception — no priority.")
@@ -69,10 +69,10 @@ for col, (key, title) in zip(cols, [("orders", "Order ledger"), ("gateway", "Pay
             st.caption("No matching record.")
         else:
             drop = [x for x in ("source_file", "load_id", "loaded_at", "updated_at") if x in df.columns]
-            st.dataframe(common.money_columns(df.drop(columns=drop)).T, use_container_width=True)
+            st.dataframe(common.money_columns(df.drop(columns=drop)).T, width="stretch")
 if "batch_transactions" in src:
     with st.expander(f"Gateway transactions in batch {r['settlement_batch_id']} ({len(src['batch_transactions'])})"):
-        st.dataframe(common.money_columns(src["batch_transactions"]), hide_index=True, use_container_width=True)
+        st.dataframe(common.money_columns(src["batch_transactions"]), hide_index=True, width="stretch")
 
 st.subheader("Resolution")
 if r["is_exception"]:
@@ -91,6 +91,6 @@ if r["is_exception"]:
     if hist.empty:
         st.caption("No resolution history yet.")
     else:
-        st.dataframe(hist, hide_index=True, use_container_width=True)
+        st.dataframe(hist, hide_index=True, width="stretch")
 else:
     st.caption("Matched records need no resolution.")

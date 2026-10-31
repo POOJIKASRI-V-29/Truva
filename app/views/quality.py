@@ -24,9 +24,9 @@ else:
     if not rej.empty:
         st.markdown("**Rejected records (latest load per source)**")
         st.dataframe(rej[["source_name", "line_no", "record_id", "reject_reason", "raw_record"]], hide_index=True,
-                     use_container_width=True)
+                     width="stretch")
     with st.expander("Full load history"):
-        st.dataframe(log, hide_index=True, use_container_width=True)
+        st.dataframe(log, hide_index=True, width="stretch")
 
 run_id = common.current_run_id()
 if run_id is None:
@@ -62,7 +62,7 @@ st.caption(f"{m['entities']:,} entities compared. Code accuracy on correctly det
            "scenarios — not accuracy on real-world data.")
 
 per = m["per_code"].copy()
-st.dataframe(per, hide_index=True, use_container_width=True, column_config={
+st.dataframe(per, hide_index=True, width="stretch", column_config={
     "precision": st.column_config.NumberColumn(format="%.3f"), "recall": st.column_config.NumberColumn(format="%.3f"),
     "f1": st.column_config.NumberColumn(format="%.3f")})
 
@@ -72,7 +72,7 @@ fig = px.imshow(np.log10(conf + 1), text_auto=False, color_continuous_scale=["#F
 fig.update_traces(text=conf.values, texttemplate="%{text}")
 fig.update_layout(height=430, margin=dict(l=0, r=0, t=10, b=0))
 st.markdown("**Confusion matrix** (colour is log-scaled so the large MATCHED cell does not hide the rest)")
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width="stretch")
 
 expl = queries.result_explanations(c, run_id)
 scen = queries.ground_truth_scenarios(c)
@@ -83,4 +83,4 @@ for title, key in [("False positives / wrong code", "false_positive_rows"), ("Mi
         df = (df.merge(scen, on=["entity_level", "entity_id"], how="left")
                 .merge(expl, on=["entity_level", "entity_id"], how="left"))
         st.dataframe(df[["entity_level", "entity_id", "actual", "predicted", "scenario", "result_id", "explanation"]],
-                     hide_index=True, use_container_width=True)
+                     hide_index=True, width="stretch")

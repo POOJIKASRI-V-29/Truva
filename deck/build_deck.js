@@ -1,11 +1,11 @@
-// Builds deck/Kanakku_Pitch.pptx. Requires pptxgenjs (npm install pptxgenjs@3.12.0).
+// Builds deck/Truva_Pitch.pptx. Requires pptxgenjs (npm install pptxgenjs@3.12.0).
 // Every figure below was measured on the bundled sample (seed 42, run 6) — see README "Measured results".
 const path = require("path");
 const pptxgen = require("pptxgenjs");
-const { applyTheme } = require(process.env.APPLY_THEME || "./apply_theme.js");
+
 
 const THEME = {
-  name: "Kanakku Navy",
+  name: "Truva Navy",
   headFontFace: "Calibri",
   bodyFontFace: "Calibri",
   colors: {
@@ -20,8 +20,8 @@ const HEX = { navy: "0B1F3A", blue: "1E3A8A", sky: "3B82F6", ice: "EEF3FB", ambe
 const pres = new pptxgen();
 pres.layout = "LAYOUT_WIDE"; // 13.333 x 7.5
 pres.theme = { headFontFace: THEME.headFontFace, bodyFontFace: THEME.bodyFontFace };
-pres.title = "Kanakku — pitch deck";
-pres.author = "Kanakku";
+pres.title = "Truva — pitch deck";
+pres.author = "Truva";
 const C = pres.SchemeColor;
 
 pres.defineSlideMaster({
@@ -39,7 +39,7 @@ pres.defineSlideMaster({
   objects: [
     { placeholder: { options: { name: "title", type: "title", x: 0.6, y: 0.35, w: 12.1, h: 0.9, fontSize: 34, bold: true, align: "left",
                                 color: C.text1, valign: "middle", margin: 0 }, text: "" } },
-    { text: { text: "Kanakku · ExaThon India 2026 · synthetic data only",
+    { text: { text: "Truva · ExaThon India 2026 · synthetic data only",
               options: { x: 0.6, y: 7.0, w: 7, h: 0.3, fontSize: 10, color: C.accent4, margin: 0 } } },
   ],
   slideNumber: { x: 12.3, y: 7.0, w: 0.5, h: 0.3, fontSize: 10, color: HEX.slate, align: "right" },
@@ -57,7 +57,7 @@ const card = (slide, x, y, w, h, name) =>
 // ---------------------------------------------------------------- 1 title
 pres.addSection({ title: "Opening" });
 let s = pres.addSlide({ masterName: "KK_DARK", sectionTitle: "Opening" });
-s.addText("Kanakku", { placeholder: "title" });
+s.addText("Truva", { placeholder: "title" });
 text(s, "Every number tells a story.", { x: 0.7, y: 3.6, w: 7.2, h: 0.6, fontSize: 28, italic: true, color: C.accent5 });
 text(s, "Three-way payment reconciliation with break explanations, built on Exasol Personal",
      { x: 0.7, y: 4.45, w: 6.6, h: 0.9, fontSize: 18, color: C.background1 });
@@ -71,7 +71,7 @@ text(s, "Ledger", { x: 8.65, y: 2.15, w: 1.6, h: 0.5, fontSize: 16, bold: true, 
 text(s, "Gateway", { x: 11.0, y: 2.15, w: 1.7, h: 0.5, fontSize: 16, bold: true, color: C.background1, align: "center" });
 text(s, "Bank", { x: 9.9, y: 4.75, w: 1.6, h: 0.5, fontSize: 16, bold: true, color: C.background1, align: "center" });
 text(s, "₹", { x: 10.2, y: 2.75, w: 1.0, h: 0.8, fontSize: 36, bold: true, color: C.background1, align: "center", valign: "middle" });
-s.addNotes("An online merchant in India sees every sale three times: in its order ledger, in the payment gateway report and in the bank statement. Kanakku reconciles all three inside Exasol and explains every break.");
+s.addNotes("An online merchant in India sees every sale three times: in its order ledger, in the payment gateway report and in the bank statement. Truva reconciles all three inside Exasol and explains every break.");
 
 // ---------------------------------------------------------------- 2 problem
 pres.addSection({ title: "Problem" });
@@ -79,7 +79,7 @@ s = pres.addSlide({ masterName: "KK_CONTENT", sectionTitle: "Problem" });
 s.addText("Three records of every sale never agree", { placeholder: "title" });
 const srcs = [
   ["L", "Order ledger", "ORD-0001234 · ₹1,499.00 · card · COMPLETED"],
-  ["G", "Payment gateway", "Captured ₹1,499.00 · fee + GST ₹33.62 · net ₹1,465.38 · batch STL-…-02, T+2"],
+  ["G", "Payment gateway", "Captured ₹1,499.00 · fee + GST ₹33.61 · net ₹1,465.39 · batch STL-…-02, T+2"],
   ["B", "Bank statement", "₹1,32,410.55 credited · “NEFT CR SETTLEMENT/STL-…-02” · ~90 payments in one line"],
 ];
 srcs.forEach(([ic, h, d], i) => {
@@ -105,7 +105,7 @@ s.addNotes("Fees, GST, T+2 batch settlements, refunds, chargebacks and duplicate
 // ---------------------------------------------------------------- 3 how it works
 pres.addSection({ title: "Solution" });
 s = pres.addSlide({ masterName: "KK_CONTENT", sectionTitle: "Solution" });
-s.addText("How Kanakku works", { placeholder: "title" });
+s.addText("How Truva works", { placeholder: "title" });
 const steps = [
   ["Validate & load", "Row-level checks, reasons + line numbers, MERGE on business keys"],
   ["Match in Exasol", "Exact → tolerance → settlement batch → conservative fuzzy"],
@@ -158,7 +158,7 @@ feats.forEach(([h, d], i) => {
   text(s, h, { x: x + 0.25, y: y + 0.2, w: 3.4, h: 0.45, fontSize: 17, bold: true, color: C.text2 });
   text(s, d, { x: x + 0.25, y: y + 0.7, w: 3.4, h: 0.75, fontSize: 14, color: C.text1, valign: "top" });
 });
-s.addNotes("All matching and aggregation is SQL in Exasol. Results, run history, ingestion audit and the resolution log all live in one Kanakku schema.");
+s.addNotes("All matching and aggregation is SQL in Exasol. Results, run history, ingestion audit and the resolution log all live in one Truva schema.");
 
 // ---------------------------------------------------------------- 5 results
 pres.addSection({ title: "Results" });
@@ -217,7 +217,7 @@ s.addNotes("The top item: a 78-payment batch that never reached the bank. Confir
 // ---------------------------------------------------------------- 7 evaluation
 s = pres.addSlide({ masterName: "KK_CONTENT", sectionTitle: "Results" });
 s.addText("Measured against a hidden answer key", { placeholder: "title" });
-const ev = [["97.0%", "precision"], ["100%", "recall"], ["98.5%", "F1"], ["111 / 111", "tests passing"]];
+const ev = [["97.0%", "precision"], ["100%", "recall"], ["98.5%", "F1"], ["142 / 142", "tests passing"]];
 ev.forEach(([v, l], i) => {
   const x = 0.6 + i * 3.05;
   card(s, x, 1.55, 2.85, 1.9, `eval-${i}`);
@@ -226,9 +226,9 @@ ev.forEach(([v, l], i) => {
 });
 const evRows = [
   ["How", "The generator writes ground-truth labels to a separate file and table. The matching SQL never reads them — a test fails if it does."],
-  ["Errors", "650 true positives, 0 missed. All 20 false positives come from 5 deliberately ambiguous pairs (same amount and method, 2 minutes apart, no reference): Kanakku refuses to guess."],
+  ["Errors", "650 true positives, 0 missed. All 20 false positives come from 5 deliberately ambiguous pairs (same amount and method, 2 minutes apart, no reference): Truva refuses to guess."],
   ["Caveat", "The generator and the rules share an author, so this shows consistency on known scenarios — not accuracy on real gateway or bank files."],
-  ["Tests", "92 unit tests + 19 integration tests on real Exasol: tolerance boundary, batches, duplicates, fees, reversals, reruns, rollback, resolution carry-forward."],
+  ["Tests", "116 unit tests + 26 integration tests on real Exasol: tolerance boundary, batches, duplicates, fees, reversals, reruns, rollback, resolution carry-forward, recurring patterns."],
 ];
 evRows.forEach(([h, d], i) => {
   const y = 3.8 + i * 0.75;
@@ -254,14 +254,14 @@ text(s, [
   { text: "Partial settlements, multi-currency, per-merchant pricing", options: { bullet: true, breakLine: true } },
   { text: "Scheduled daily runs and maker-checker approvals", options: { bullet: true } },
 ], { x: 7.0, y: 1.4, w: 5.6, h: 2.6, fontSize: 16, color: C.background1, paraSpaceAfter: 8, valign: "top" });
-text(s, "Kanakku", { x: 0.7, y: 4.5, w: 7, h: 1.2, fontSize: 60, bold: true, color: C.background1 });
+text(s, "Truva", { x: 0.7, y: 4.5, w: 7, h: 1.2, fontSize: 60, bold: true, color: C.background1 });
 text(s, "Every number tells a story.", { x: 0.7, y: 5.7, w: 7, h: 0.6, fontSize: 28, italic: true, color: C.accent5 });
-text(s, "MIT licensed · python -m kanakku demo · Exasol Personal", { x: 0.7, y: 6.5, w: 8, h: 0.4, fontSize: 14, color: C.accent5 });
-s.addNotes("Kanakku: Exasol does the heavy matching, every exception is explained with evidence, and analysts know what to look at first.");
+text(s, "MIT licensed · .venv/bin/python -m kanakku demo · Exasol Personal", { x: 0.7, y: 6.5, w: 8, h: 0.4, fontSize: 14, color: C.accent5 });
+s.addNotes("Truva: Exasol does the heavy matching, every exception is explained with evidence, and analysts know what to look at first.");
 
 (async () => {
-  const out = path.join(__dirname, "Kanakku_Pitch.pptx");
+  const out = path.join(__dirname, "Truva_Pitch.pptx");
   await pres.writeFile({ fileName: out });
-  await applyTheme(out, THEME);
+
   console.log("wrote", out);
 })();

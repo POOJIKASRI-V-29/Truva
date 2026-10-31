@@ -35,7 +35,7 @@ view = view[["result_id", "priority_score", "priority_band", "issue_code", "enti
              "evidence_type", "exposure_inr", "discrepancy_inr", "age_days", "resolution_status", "match_stage",
              "explanation"]]
 event = st.dataframe(
-    view, hide_index=True, use_container_width=True, height=520, on_select="rerun", selection_mode="single-row",
+    view, hide_index=True, width="stretch", height=520, on_select="rerun", selection_mode="single-row",
     column_config={
         "result_id": st.column_config.NumberColumn("Result", format="%d"),
         "priority_score": st.column_config.ProgressColumn("Score", min_value=0, max_value=100, format="%d"),

@@ -5,6 +5,7 @@
   load [--dir DIR] [--replace] [--no-truth]
   reconcile [--tolerance PAISE] [--delay-days N] [--no-fuzzy] [--as-of YYYY-MM-DD]
   evaluate [--run-id N]
+  patterns [--run-id N] [--min-support N] [--all]   recurring-break intelligence
   demo                        generate sample data, load (replace), reconcile, evaluate
 """
 
@@ -15,7 +16,7 @@ from datetime import date
 
 import pandas as pd
 
-from . import db, evaluation, generator, reconciliation, schema
+from . import db, evaluation, generator, patterns, reconciliation, schema
 from .config import SAMPLE_DIR, ReconConfig
 from .money import format_inr
 from .pipeline import load_directory
@@ -64,6 +65,30 @@ def cmd_evaluate(a):
         print(m["per_code"].to_string(index=False))
 
 
+def cmd_patterns(a):
+    with db.session() as conn:
+        run_id = a.run_id or reconciliation.latest_run_id(conn)
+        if not run_id:
+            print("  no completed run")
+            return
+        df = patterns.analyse(conn, run_id, min_support=a.min_support)
+    if df.empty:
+        print(f"  run {run_id}: no unresolved exceptions")
+        return
+    sup = df[df.supported]
+    print(f"  run {run_id}: {len(df)} groups checked, {len(sup)} recurring pattern(s) supported")
+    for r in (df if a.all else sup).to_dict("records"):
+        print(f"\n  [{r['verdict']}] {patterns.DIMENSION_LABELS[r['dimension']]} · {r['issue_code']} · {r['dimension_value']}")
+        print(f"    Evidence: {r['evidence']}")
+        if r["supported"]:
+            print(f"    {r['hypothesis']}")
+            print(f"    Investigate: {r['investigate']}")
+            print(f"    Confirms/refutes: {r['confirm_or_refute']}")
+            print(f"    Example result ids: {', '.join(map(str, patterns.example_ids(r)))}")
+        else:
+            print(f"    Not supported: {r['reason']}")
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="kanakku", description="Kanakku — every number tells a story.")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -83,6 +108,10 @@ def main(argv=None):
     rc.add_argument("--as-of")
     ev = sub.add_parser("evaluate")
     ev.add_argument("--run-id", type=int)
+    pt = sub.add_parser("patterns")
+    pt.add_argument("--run-id", type=int)
+    pt.add_argument("--min-support", type=int, default=3)
+    pt.add_argument("--all", action="store_true", help="also list groups that are not supported")
     sub.add_parser("demo")
     a = p.parse_args(argv)
 
@@ -98,6 +127,8 @@ def main(argv=None):
         cmd_reconcile(a)
     elif a.cmd == "evaluate":
         cmd_evaluate(a)
+    elif a.cmd == "patterns":
+        cmd_patterns(a)
     elif a.cmd == "demo":
         print("generate:"); cmd_generate(argparse.Namespace(seed=42, orders=10_000, out=str(SAMPLE_DIR)))
         print("load:"); cmd_load(argparse.Namespace(dir=str(SAMPLE_DIR), replace=True, no_truth=False))

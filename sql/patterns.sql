@@ -1,0 +1,138 @@
+-- Recurring-break intelligence for one reconciliation run, executed inside Exasol.
+-- Groups the run's unresolved exceptions along the dimensions the results support and
+-- returns, for every group, the counts and denominators needed to judge whether it recurs.
+-- Reads RECONCILIATION_RESULTS and FEE_RATE_CARD only. {run_id} is a validated integer.
+--
+-- METRIC = 'RATE'  : exceptions per order in the group, compared with the rate across all groups
+-- METRIC = 'SHARE' : share of one issue's exceptions that fall in this group
+WITH open_exc AS (
+    SELECT RESULT_ID, ENTITY_LEVEL, ISSUE_CODE, PAYMENT_METHOD, SETTLEMENT_BATCH_ID, EXPOSURE_MINOR,
+           DISCREPANCY_MINOR, EXPECTED_AMOUNT_MINOR, AGE_DAYS
+    FROM RECONCILIATION_RESULTS
+    WHERE RUN_ID = {run_id} AND IS_EXCEPTION
+      AND RESOLUTION_STATUS NOT IN ('RESOLVED', 'ACCEPTED_DIFFERENCE')
+),
+run_orders AS (
+    SELECT PAYMENT_METHOD, SETTLEMENT_BATCH_ID
+    FROM RECONCILIATION_RESULTS
+    WHERE RUN_ID = {run_id} AND ENTITY_LEVEL = 'ORDER'
+),
+
+-- 1. payment method: order- and gateway-level exceptions per order paid by that method
+method_size AS (
+    SELECT o.PAYMENT_METHOD, COUNT(*) AS GROUP_SIZE, MAX(COALESCE(rc.FEE_BPS, 0)) AS FEE_BPS
+    FROM run_orders o
+    LEFT JOIN FEE_RATE_CARD rc ON rc.PAYMENT_METHOD = o.PAYMENT_METHOD
+    WHERE o.PAYMENT_METHOD IS NOT NULL
+    GROUP BY o.PAYMENT_METHOD
+),
+method_exc AS (
+    SELECT ISSUE_CODE, PAYMENT_METHOD, COUNT(*) AS N, SUM(EXPOSURE_MINOR) AS EXPOSURE_MINOR,
+           AVG(AGE_DAYS) AS AVG_AGE, MAX(AGE_DAYS) AS MAX_AGE,
+           GROUP_CONCAT(RESULT_ID ORDER BY EXPOSURE_MINOR DESC, RESULT_ID SEPARATOR ',') AS EXAMPLES
+    FROM open_exc
+    WHERE ENTITY_LEVEL IN ('ORDER', 'GATEWAY_TXN') AND PAYMENT_METHOD IS NOT NULL
+    GROUP BY ISSUE_CODE, PAYMENT_METHOD
+),
+method_grid AS (
+    SELECT i.ISSUE_CODE, s.PAYMENT_METHOD AS DIMENSION_VALUE, s.GROUP_SIZE, COALESCE(x.N, 0) AS N,
+           x.EXPOSURE_MINOR, x.AVG_AGE, x.MAX_AGE, x.EXAMPLES,
+           SUM(COALESCE(x.N, 0)) OVER (PARTITION BY i.ISSUE_CODE) AS ISSUE_TOTAL,
+           SUM(s.GROUP_SIZE) OVER (PARTITION BY i.ISSUE_CODE) AS POPULATION,
+           COUNT(*) OVER (PARTITION BY i.ISSUE_CODE) AS GROUPS_TESTED
+    FROM (SELECT DISTINCT ISSUE_CODE FROM method_exc) i
+    CROSS JOIN method_size s
+    LEFT JOIN method_exc x ON x.ISSUE_CODE = i.ISSUE_CODE AND x.PAYMENT_METHOD = s.PAYMENT_METHOD
+    -- a fee difference cannot arise on a method the rate card charges nothing for,
+    -- so those methods are left out of that issue's baseline instead of diluting it
+    WHERE i.ISSUE_CODE <> 'POSSIBLE_FEE_DIFFERENCE' OR s.FEE_BPS > 0
+),
+
+-- 2. settlement batch: order- and gateway-level exceptions per order settled in the batch
+batch_size AS (
+    SELECT SETTLEMENT_BATCH_ID, COUNT(*) AS GROUP_SIZE
+    FROM run_orders
+    WHERE SETTLEMENT_BATCH_ID IS NOT NULL
+    GROUP BY SETTLEMENT_BATCH_ID
+),
+batch_exc AS (
+    SELECT SETTLEMENT_BATCH_ID, COUNT(*) AS N, SUM(EXPOSURE_MINOR) AS EXPOSURE_MINOR,
+           AVG(AGE_DAYS) AS AVG_AGE, MAX(AGE_DAYS) AS MAX_AGE,
+           GROUP_CONCAT(RESULT_ID ORDER BY EXPOSURE_MINOR DESC, RESULT_ID SEPARATOR ',') AS EXAMPLES,
+           GROUP_CONCAT(DISTINCT ISSUE_CODE ORDER BY ISSUE_CODE SEPARATOR ', ') AS ISSUE_MIX
+    FROM open_exc
+    WHERE ENTITY_LEVEL IN ('ORDER', 'GATEWAY_TXN') AND SETTLEMENT_BATCH_ID IS NOT NULL
+    GROUP BY SETTLEMENT_BATCH_ID
+),
+batch_own AS (
+    SELECT SETTLEMENT_BATCH_ID, MAX(ISSUE_CODE) AS BATCH_ISSUE
+    FROM open_exc
+    WHERE ENTITY_LEVEL = 'SETTLEMENT_BATCH'
+    GROUP BY SETTLEMENT_BATCH_ID
+),
+batch_grid AS (
+    SELECT s.SETTLEMENT_BATCH_ID AS DIMENSION_VALUE, s.GROUP_SIZE, COALESCE(x.N, 0) AS N,
+           x.EXPOSURE_MINOR, x.AVG_AGE, x.MAX_AGE, x.EXAMPLES,
+           'issues: ' || x.ISSUE_MIX
+               || CASE WHEN b.BATCH_ISSUE IS NOT NULL THEN '; batch itself: ' || b.BATCH_ISSUE ELSE '' END AS CONTEXT,
+           SUM(COALESCE(x.N, 0)) OVER () AS ISSUE_TOTAL,
+           SUM(s.GROUP_SIZE) OVER () AS POPULATION,
+           COUNT(*) OVER () AS GROUPS_TESTED
+    FROM batch_size s
+    LEFT JOIN batch_exc x ON x.SETTLEMENT_BATCH_ID = s.SETTLEMENT_BATCH_ID
+    LEFT JOIN batch_own b ON b.SETTLEMENT_BATCH_ID = s.SETTLEMENT_BATCH_ID
+),
+
+-- 3. amount-difference shape: direction and size of the difference relative to the
+--    expected amount. Fee differences are defined by their shape, so they are excluded
+--    here: grouping them by it would only restate the rule that flagged them.
+amount_exc AS (
+    SELECT ISSUE_CODE, ENTITY_LEVEL, RESULT_ID, EXPOSURE_MINOR, AGE_DAYS,
+           CASE WHEN DISCREPANCY_MINOR < 0 THEN 'short by ' ELSE 'over by ' END
+           || CASE WHEN ABS(DISCREPANCY_MINOR) * 100 < EXPECTED_AMOUNT_MINOR THEN 'under 1%'
+                   WHEN ABS(DISCREPANCY_MINOR) * 100 < EXPECTED_AMOUNT_MINOR * 5 THEN '1-5%'
+                   WHEN ABS(DISCREPANCY_MINOR) * 100 < EXPECTED_AMOUNT_MINOR * 20 THEN '5-20%'
+                   ELSE '20% or more' END
+           || ' of the expected amount' AS DIMENSION_VALUE
+    FROM open_exc
+    WHERE ISSUE_CODE = 'AMOUNT_MISMATCH' AND DISCREPANCY_MINOR <> 0 AND EXPECTED_AMOUNT_MINOR > 0
+),
+amount_grp AS (
+    SELECT ISSUE_CODE, ENTITY_LEVEL, DIMENSION_VALUE, COUNT(*) AS N, SUM(EXPOSURE_MINOR) AS EXPOSURE_MINOR,
+           AVG(AGE_DAYS) AS AVG_AGE, MAX(AGE_DAYS) AS MAX_AGE,
+           GROUP_CONCAT(RESULT_ID ORDER BY EXPOSURE_MINOR DESC, RESULT_ID SEPARATOR ',') AS EXAMPLES,
+           SUM(COUNT(*)) OVER (PARTITION BY ISSUE_CODE, ENTITY_LEVEL) AS ISSUE_TOTAL
+    FROM amount_exc
+    GROUP BY ISSUE_CODE, ENTITY_LEVEL, DIMENSION_VALUE
+),
+
+-- 4. ageing: how much of each issue's open backlog sits in each age bucket
+age_grp AS (
+    SELECT ISSUE_CODE,
+           CASE WHEN AGE_DAYS < 7 THEN '0-6 days' WHEN AGE_DAYS < 14 THEN '7-13 days'
+                WHEN AGE_DAYS < 30 THEN '14-29 days' WHEN AGE_DAYS < 60 THEN '30-59 days'
+                ELSE '60+ days' END AS DIMENSION_VALUE,
+           COUNT(*) AS N, SUM(EXPOSURE_MINOR) AS EXPOSURE_MINOR, AVG(AGE_DAYS) AS AVG_AGE, MAX(AGE_DAYS) AS MAX_AGE,
+           GROUP_CONCAT(RESULT_ID ORDER BY EXPOSURE_MINOR DESC, RESULT_ID SEPARATOR ',') AS EXAMPLES,
+           SUM(COUNT(*)) OVER (PARTITION BY ISSUE_CODE) AS ISSUE_TOTAL
+    FROM open_exc
+    GROUP BY 1, 2
+)
+
+SELECT 'PAYMENT_METHOD' AS DIMENSION, 'RATE' AS METRIC, ISSUE_CODE, CAST(NULL AS VARCHAR(20)) AS ENTITY_LEVEL,
+       DIMENSION_VALUE, N, GROUP_SIZE, ISSUE_TOTAL, POPULATION, GROUPS_TESTED,
+       EXPOSURE_MINOR, AVG_AGE, MAX_AGE, EXAMPLES, CAST(NULL AS VARCHAR(400)) AS CONTEXT
+FROM method_grid WHERE N > 0
+UNION ALL
+SELECT 'SETTLEMENT_BATCH', 'RATE', 'ANY', NULL, DIMENSION_VALUE, N, GROUP_SIZE, ISSUE_TOTAL, POPULATION,
+       GROUPS_TESTED, EXPOSURE_MINOR, AVG_AGE, MAX_AGE, EXAMPLES, CONTEXT
+FROM batch_grid WHERE N > 0
+UNION ALL
+-- 2 directions x 4 size bands = 8 possible groups per issue and level
+SELECT 'AMOUNT_PATTERN', 'SHARE', ISSUE_CODE, ENTITY_LEVEL, DIMENSION_VALUE, N, ISSUE_TOTAL, ISSUE_TOTAL, NULL, 8,
+       EXPOSURE_MINOR, AVG_AGE, MAX_AGE, EXAMPLES, NULL
+FROM amount_grp
+UNION ALL
+SELECT 'AGEING', 'SHARE', ISSUE_CODE, NULL, DIMENSION_VALUE, N, ISSUE_TOTAL, ISSUE_TOTAL, NULL, 5,
+       EXPOSURE_MINOR, AVG_AGE, MAX_AGE, EXAMPLES, NULL
+FROM age_grp

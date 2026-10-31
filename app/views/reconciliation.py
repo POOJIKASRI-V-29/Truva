@@ -50,7 +50,7 @@ if run_id:
     bs = queries.by_stage(c, run_id)
     pivot = bs.pivot_table(index=["entity_level", "issue_code"], columns="match_stage", values="n",
                            aggfunc="sum", fill_value=0)
-    st.dataframe(pivot, use_container_width=True)
+    st.dataframe(pivot, width="stretch")
     st.caption("Stages: EXACT = reference + amount equal · TOLERANCE = amount within tolerance · KEY_ONLY = reference "
                "matched, amount did not · BATCH_REF / BATCH_CONSTRAINED = settlement batch linked by narration "
                "reference / by unique amount+date · FUZZY = unique same-amount payment near the order time · "
@@ -62,4 +62,4 @@ if not runs.empty:
     runs = runs[["run_id", "run_status", "started_at", "as_of_date", "orders_total", "orders_matched",
                  "exceptions_total", "exposure_minor", "duration_ms", "params", "error_message"]].copy()
     runs["exposure_inr"] = pd.to_numeric(runs.pop("exposure_minor"), errors="coerce") / 100
-    st.dataframe(runs, hide_index=True, use_container_width=True)
+    st.dataframe(runs, hide_index=True, width="stretch")

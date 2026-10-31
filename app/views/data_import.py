@@ -50,8 +50,8 @@ with tab_upload:
             else:
                 st.success("All rows valid.")
 
-    replace = st.checkbox("Replace Kanakku's existing source data before loading",
-                          help="Truncates ORDERS, GATEWAY_TRANSACTIONS and BANK_TRANSACTIONS in the Kanakku schema "
+    replace = st.checkbox("Replace Truva's existing source data before loading",
+                          help="Truncates ORDERS, GATEWAY_TRANSACTIONS and BANK_TRANSACTIONS in the Truva database schema "
                                "only. Reconciliation history and resolution notes are kept.")
     if st.button("Load validated rows into Exasol", type="primary", disabled=not results):
         if replace:

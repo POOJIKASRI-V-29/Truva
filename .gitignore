@@ -26,5 +26,6 @@ data/uploads/
 # Streamlit
 .streamlit/secrets.toml
 
+
 # Local tool config
 .claude/

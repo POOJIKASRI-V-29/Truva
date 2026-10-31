@@ -1,4 +1,4 @@
-# Kanakku architecture
+# Truva architecture
 
 ## Components
 
@@ -14,6 +14,7 @@
 | Prioritisation | `kanakku/priority.py` | Weight tables → Python reference score and generated SQL `UPDATE` |
 | Resolution | `kanakku/resolution.py` | Append-only status/notes log |
 | Evaluation | `kanakku/evaluation.py` | Engine output vs ground truth: detection and per-code metrics |
+| Recurring breaks | `kanakku/patterns.py`, `sql/patterns.sql` | Groups unresolved exceptions in Exasol; Wilson/Bonferroni support test; hypothesis wording |
 | UI data | `kanakku/queries.py` | All read-only SQL the dashboard uses |
 | UI | `app/` | Streamlit multipage app |
 
@@ -84,6 +85,33 @@ whole run back and records the run as `FAILED`.
 | `UNRESOLVED` | gateway / bank | suspected | Payment or reversal pointing at no ledger order; bank line with no usable reference or match |
 | `AWAITING_SETTLEMENT` | order / batch | n/a | Not yet credited but still inside the grace period (not an exception) |
 
+## Recurring-break intelligence (`sql/patterns.sql`, `kanakku/patterns.py`)
+
+The feature is read-only: it reads `RECONCILIATION_RESULTS` and `FEE_RATE_CARD` for one run and writes nothing, so it
+cannot change a reconciliation result.
+
+1. **`open_exc`** holds the run's exceptions whose status is not `RESOLVED` or `ACCEPTED_DIFFERENCE`.
+   **`run_orders`** holds the run's order rows, which give the denominators. Using the run's own rows keeps the
+   counts consistent even if the source data is reloaded later.
+2. **Rate dimensions** (payment method, settlement batch) build a grid: each issue `CROSS JOIN` each group, with a
+   `LEFT JOIN` to the exception counts. Window sums over the grid give the issue's total, the population and the
+   number of groups compared, so groups with zero exceptions still count in the baseline. For fee differences the
+   grid drops methods the rate card charges 0 bps.
+3. **Share dimensions** (amount-difference shape, ageing) use `SUM(COUNT(*)) OVER (PARTITION BY issue)` for the
+   issue's total.
+4. **Python** (`assess`) computes the group rate and its Wilson interval with
+   `z = Φ⁻¹(1 − α / groups_compared)`. A group is supported when it has at least `min_support` exceptions and the
+   lower bound beats the overall rate (rate groups) or 50% (share groups). It is labelled *Strong* when the lower
+   bound is at least 2× the overall rate, or at least 75% for share groups.
+5. **`narrative`** fills a template keyed by (dimension, issue) with four parts: evidence, a hypothesis that always
+   starts "Hypothesis (not verified)", a suggested investigation, and what would confirm or refute it. Templates
+   avoid causal certainty, and a test enforces that.
+
+Dimensions deliberately **not** grouped, because the result would restate a rule instead of finding something:
+
+- fee differences by amount shape (the shape is the rule that flags them)
+- bank-leg issues by settlement mode (the engine only judges instant settlements per order)
+
 ## Design decisions
 
 - **SQL in Exasol, not pandas,** for matching. That is the analytical workload Exasol is built for, and it keeps
@@ -95,5 +123,5 @@ whole run back and records the run as `FAILED`.
 - **Conservative matching.** Every non-exact link must be unique in both directions, because a wrong automatic
   match hides money while an extra exception only costs a look.
 - **Integer paise** end to end, with integer half-up fee arithmetic mirrored in SQL (`FLOOR((x·bps + 5000)/10000)`).
-- **Only Kanakku's own schema is touched.** `--replace` truncates only the three source tables, and the tests use
+- **Only Truva's own schema is touched.** `--replace` truncates only the three source tables, and the tests use
   a separate `KANAKKU_TEST` schema.

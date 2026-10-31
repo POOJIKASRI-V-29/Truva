@@ -38,7 +38,7 @@ with left:
                      labels={"n": "Exceptions", "issue_code": "", "entity_level": "Level"})
         fig.update_layout(height=360, margin=dict(l=0, r=0, t=10, b=0), yaxis={"categoryorder": "total ascending"},
                           legend=dict(orientation="h", y=-0.2), plot_bgcolor="white")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 with right:
     st.subheader("Priority mix")
     bb = queries.by_band(c, run_id)
@@ -46,7 +46,7 @@ with right:
         fig = go.Figure(go.Pie(labels=bb.priority_band, values=bb.n, hole=.6, sort=False,
                                marker_colors=[common.BAND_COLORS.get(b, common.SLATE) for b in bb.priority_band]))
         fig.update_layout(height=360, margin=dict(l=0, r=0, t=10, b=0), legend=dict(orientation="h", y=-0.1))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 left, right = st.columns([3, 2])
 with left:
@@ -57,7 +57,7 @@ with left:
     fig.add_bar(x=tr.order_day, y=tr.exceptions, name="Exceptions", marker_color=common.BLUE)
     fig.update_layout(barmode="stack", height=320, margin=dict(l=0, r=0, t=10, b=0), plot_bgcolor="white",
                       legend=dict(orientation="h", y=1.1))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 with right:
     st.subheader("Ageing of unresolved exceptions")
     ag = queries.ageing(c, run_id)
@@ -66,7 +66,7 @@ with right:
         fig = px.bar(ag, x="bucket", y="n", color_discrete_sequence=[common.NAVY], hover_data={"exposure_inr": ":,.2f"},
                      labels={"bucket": "", "n": "Exceptions"})
         fig.update_layout(height=320, margin=dict(l=0, r=0, t=10, b=0), plot_bgcolor="white")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 st.subheader("Resolution status")
 sc = queries.status_counts(c, run_id)
